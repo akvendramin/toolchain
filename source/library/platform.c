@@ -285,25 +285,52 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
         m2 = (1 << 52) | m;
     }
 
-    // mantissa and exponent -> d ~= m2 * 2^e2 
+    // scale the numerator and denominator to integer
+    // mantissa and exponent -> d ~= m2 * 2^e2
+    
+    // normalized
+    // v ~= m2 * 2^e2
+    // m2 = 1 + f / 2^52
+    // m2 = (2^52 + f) / 2^52
+    // m2 * 2^52 = (2^52 + f) * 2^52 / 2^52
+    // "m2 * 2^52 = 2^52 + f" scaled value
+    // v ~= m2/2^52 * 2^e2
+    // v ~= m2 * 2^e2-52
+
+    // subnormal
+    // v ~= m2 * 2^e2
+    // m2 = f / 2^52
+    // m2 * 2^52 = f * 2^52 / 2*^52
+    // "m2 * 2^52 = f" scaled value
+    // v ~= m2 * 2^e2
+    // v ~= f/2^52 * 2^e2
+    // v ~= f * 2^e2-52
+
     uptr n;
     uptr d;
 
     if(e2 >= 0)
     {
+        // d ~= m * 2^e2
+        // i = (1 + f/2^52) * 2^e
+        // i = (2^52 + f)/2^52 * 2^e
+        // i = (2^52 + f) / 2^e-52
+        
         n = m2 << e2;
         d = 1;
     }
     else
     {
-        // v ~= m2 / 2^-e2 
-        // v ~= (m2 * 5^-e2) / (2^-e2 * 5^-e2)
-        // v ~= m2 * (5^-e2 / (10^-e2)
-        n = m2 * PlatformPower(5, -e2);
-        d = 1 << -e2;
+        // d ~= m * 2^e2
+        // i = m * 2^-e2
+        // i = f * 2^-1074
+        // i = f / 2^1074
+        n = m2;
+        d = 1 << -e2; // 2^-e2
     }
 
-    
+    // maybe reduce the fraction with Greatest Common Divisor
+
     return Result;
 }
 
