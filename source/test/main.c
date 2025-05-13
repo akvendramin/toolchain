@@ -16,9 +16,9 @@ int main(int ArgumentCount, char **Argument)
     Print("%d %i %d\n", 0, -1, 1234);
     Print("%d %i %d\n", 0, -1, 1234);
 
-    Print("%f %f %f\n", 0.0, 0.1, 1.234);
-    Print("%f %f %f\n", 0.0, 0.1, 1.234);
-    Print("%f %f %f\n", 0.0, 0.1, 1.234);
+    Print("%f %f %f\n", 0.1, 0.0, 1.234);
+    Print("%f %f %f\n", 0.1, 0.0, 1.234);
+    Print("%f %f %f\n", 0.1, 0.0, 1.234);
 
     Print("%lld %lli\n", 0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF);
     Print("%lld %lli\n", 0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF);

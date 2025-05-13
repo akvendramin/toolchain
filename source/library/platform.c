@@ -13,11 +13,18 @@ typedef uptr* va_args;
 typedef struct
 {
     u64 Value[2048];
+    uptr Size;
 } big_integer;
+
+union
+{
+    f64 Value;
+    u64 ValueU64;
+} double_precision;
 
 PLATFORM_API uptr PlatformFormatString(char *Buffer, uptr BufferSize, char *Format, ...);
 
-internal_function void PlatformSetBigInteger(big_integer *BigInteger, f64 Value)
+internal_function void PlatformSetBigInteger(big_integer *BigInteger, u64 Value)
 {
     BigInteger->Value[0] = Value;
 }
@@ -258,18 +265,30 @@ internal_function int PlatformPower(int Base, int Exponent)
     return 0;
 }
 
-// float to string
-internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buffer, uptr BufferSize)
+// set a big int to u64
+internal_function void BigIntegerToU64(big_integer *BigInteger, u64 Value)
 {
+    BigInteger->Value[0] = Value;
+    
+    while(Value)
+    {
+        BigInteger->Size++;
+        Value /= 10;
+    }
+}
+
+/*
     uptr Result = (uptr)Precision;
+    ieee_754 v = {0};
+    v.Value = Value;
 
     // extract the sign (1), biased-exponent (11) and significant (52)
-    bool s = Value < 0;
-    int e = (Value >> 52) & ((1 << 11) - 1);
-    uptr m = Value & ((1 << 52) - 1);
+    uptr s = v.Value < 0;
+    uptr e = (v.ValueU64 >> 52) & ((1 << 11) - 1);
+    uptr m = v.ValueU64 & ((1ULL << 52) - 1);
 
     // unbiased the exponent and compute the new mantissa/significand
-    int e2;
+    sptr e2;
     uptr m2;
     
     if(!e)
@@ -282,7 +301,7 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
     {
         // normalized number
         e2 = e - 1023 - 52;
-        m2 = (1 << 52) | m;
+        m2 = (1ULL << 52) | m;
     }
 
     // scale the numerator and denominator to integer
@@ -306,8 +325,8 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
     // v ~= f/2^52 * 2^e2
     // v ~= f * 2^e2-52
 
-    uptr n;
-    uptr d;
+    big_integer n;
+    big_integer d;
 
     if(e2 >= 0)
     {
@@ -316,8 +335,8 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
         // i = (2^52 + f)/2^52 * 2^e
         // i = (2^52 + f) / 2^e-52
         
-        n = m2 << e2;
-        d = 1;
+        BigIntegerToU64(&n, m2 << e2);
+        BigIntegerToU64(&n, 1);
     }
     else
     {
@@ -325,11 +344,44 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
         // i = m * 2^-e2
         // i = f * 2^-1074
         // i = f / 2^1074
-        n = m2;
-        d = 1 << -e2; // 2^-e2
+        BigIntegerToU64(&n, m2);
+        BigIntegerToU64(&d, 1ULL << -e2);
     }
 
-    // maybe reduce the fraction with Greatest Common Divisor
+    // @TODO: maybe reduce the fraction with Greatest Common Divisor
+
+    //
+*/
+
+// float to string
+internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buffer, uptr BufferSize)
+{
+    // use a union to analyze or manipulate float with bitwise operations
+    double_precision Double = {0};
+    Double.Value = Value;
+
+    // get sign [63], exponent [62:52], significand [0:51] from double
+    uptr Sign = Double.ValueU64 >> 63;
+    uptr Exponent = (Double.ValueU64 >> 52) & ((1 << 11) - 1);
+    uptr Significand = Double.ValueU64 & ((1 << 52) - 1);
+
+    // constant
+    uptr ExponentMax = 1023;
+    uptr ExponentMin = 1 - ExponentMax;
+
+    if(!Exponent)
+    {
+        // subnormal number has exponent fixed 2^-1074
+        // (-1)^Sign
+        Exponent = ExponentMin - 52;
+    }
+    else
+    {
+        // normal number
+        
+        Exponent = Exponent - ExponentMax - 52;
+        Significand = (1 << 52) | Significand;
+    }
 
     return Result;
 }
