@@ -372,13 +372,17 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
     if(!Exponent)
     {
         // subnormal number has exponent fixed 2^-1074
-        // (-1)^Sign
+        // d ~= (-1)^Sign * (f/2^52) * 2^e
+        // d ~= f * 2^e-52
         Exponent = ExponentMin - 52;
     }
     else
     {
         // normal number
-        
+        // d ~= (-1)^Sign * (1 + (f/2^52)) * 2^e
+        // d ~= (1 + (f/2^52)) * 2^e
+        // d ~= (2^52 + f)/2^52 * 2^e
+        // d ~= (2^52 + f) / 2^e-52
         Exponent = Exponent - ExponentMax - 52;
         Significand = (1 << 52) | Significand;
     }
