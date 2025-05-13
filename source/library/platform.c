@@ -16,7 +16,7 @@ typedef struct
     uptr Size;
 } big_integer;
 
-union
+typedef union
 {
     f64 Value;
     u64 ValueU64;
@@ -260,14 +260,27 @@ internal_function f64 PlatformStringToFloat(char *Buffer, uptr BufferSize)
     return Result;
 }
 
+// pow
 internal_function int PlatformPower(int Base, int Exponent)
 {
     return 0;
 }
 
-// set a big int to u64
-internal_function void BigIntegerToU64(big_integer *BigInteger, u64 Value)
+// memcpy
+internal_function void PlatformMemorySet(void *Memory, uptr MemoryCount, u8 Value)
 {
+    u8 *memory = Memory;
+
+    for(uptr Index = 0; Index < MemoryCount; Index++)
+    {
+        *memory++ = Value;
+    }
+}
+
+// set a big int to u64
+internal_function void BigIntegerFromU64(big_integer *BigInteger, u64 Value)
+{
+    PlatformMemorySet(BigInteger->Value, ArrayCount(BigInteger->Value), 0);
     BigInteger->Value[0] = Value;
     
     while(Value)
@@ -356,36 +369,67 @@ internal_function void BigIntegerToU64(big_integer *BigInteger, u64 Value)
 // float to string
 internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buffer, uptr BufferSize)
 {
+    //@TODO: Why 10^17 when scaling numerator/denominator big int
+    uptr Result = Precision;
+
     // use a union to analyze or manipulate float with bitwise operations
     double_precision Double = {0};
     Double.Value = Value;
 
     // get sign [63], exponent [62:52], significand [0:51] from double
     uptr Sign = Double.ValueU64 >> 63;
-    uptr Exponent = (Double.ValueU64 >> 52) & ((1 << 11) - 1);
-    uptr Significand = Double.ValueU64 & ((1 << 52) - 1);
+    uptr Exponent = (Double.ValueU64 >> 52) & ((1ULL << 11) - 1);
+    uptr Significand = Double.ValueU64 & ((1ULL << 52) - 1);
 
-    // constant
+    // some constants
     uptr ExponentMax = 1023;
     uptr ExponentMin = 1 - ExponentMax;
 
+    // unbiase the exponent and update the significand with or without the leading 1
     if(!Exponent)
     {
         // subnormal number has exponent fixed 2^-1074
-        // d ~= (-1)^Sign * (f/2^52) * 2^e
-        // d ~= f * 2^e-52
         Exponent = ExponentMin - 52;
     }
     else
     {
         // normal number
-        // d ~= (-1)^Sign * (1 + (f/2^52)) * 2^e
-        // d ~= (1 + (f/2^52)) * 2^e
-        // d ~= (2^52 + f)/2^52 * 2^e
-        // d ~= (2^52 + f) / 2^e-52
         Exponent = Exponent - ExponentMax - 52;
-        Significand = (1 << 52) | Significand;
+        Significand = (1ULL << 52) | Significand;
     }
+
+    // we ignore the sign in both for now...
+
+    // normal number
+    // d ~= m * 2^e
+    // d ~= (1 + (f/2^52)) * 2^e
+    // d ~= (2^52 + f)/2^52 * 2^e
+    // i = (2^52 + f) / 2^e-52
+
+    // subnormal number has exponent fixed 2^-1074
+    // d ~= m * 2^-e
+    // i = m * 2^-1074
+    // i = m / 2^1074
+
+    big_integer Numerator = {0};
+    big_integer Denominator = {0};
+
+    if(Exponent > 0)
+    {
+        BigIntegerFromU64(&Numerator, Significand);
+        BigIntegerFromU64(&Denominator, 1ULL << (Exponent - 52));
+        Assert((Exponent - 52) > 0);
+    }
+    else
+    {
+        BigIntegerFromU64(&Numerator, Significand);
+        BigIntegerFromU64(&Denominator, 1ULL << -Exponent);
+    }
+
+    // what operations do i need for numerator/denominator? division, multiplication, pow
+    // i scaled by 10^17 because log10(2^53) ~= 15.95 and we need 17 digits because 16 + 1 for round trip stuff
+    // n / d
+    // n*10^17 / d
 
     return Result;
 }
