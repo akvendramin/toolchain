@@ -281,7 +281,7 @@ internal_function void PlatformMemorySet(void *Memory, uptr MemoryCount, u8 Valu
 internal_function void BigIntegerFromU64(big_integer *BigInteger, u64 Value)
 {
     PlatformMemorySet(BigInteger->Value, ArrayCount(BigInteger->Value), 0);
-    BigInteger->Value[0] = Value;
+    BigInteger->Value[ArrayCount(BigInteger->Value) - 1] = Value;
     
     while(Value)
     {
@@ -290,81 +290,50 @@ internal_function void BigIntegerFromU64(big_integer *BigInteger, u64 Value)
     }
 }
 
-/*
-    uptr Result = (uptr)Precision;
-    ieee_754 v = {0};
-    v.Value = Value;
+internal_function void BigIntegerMultiplyU64(big_integer *BigInteger, u64 Value)
+{
+    // 1 2 3 4 5 - - -
+    // 12
 
-    // extract the sign (1), biased-exponent (11) and significant (52)
-    uptr s = v.Value < 0;
-    uptr e = (v.ValueU64 >> 52) & ((1 << 11) - 1);
-    uptr m = v.ValueU64 & ((1ULL << 52) - 1);
-
-    // unbiased the exponent and compute the new mantissa/significand
-    sptr e2;
-    uptr m2;
-    
-    if(!e)
+    for(uptr Index = BigInteger->Size - 1; Index >= 0; Index--)
     {
-        // subnormal number
-        e2 = 1 - 1023 - 52;
-        m2 = m;
+        // 9999 8888 7777 ... 0000
+        // 12
+
+        for(uptr Index = BigInteger->Size - 1; Index >= 0; Index--)
+        {
+            // 7777
+            u64 Multiplicand = BigInteger->Value[Index];
+            u64 Multiplier = Value;
+
+            while(Multiplicand > 0)
+            {
+                // 7
+                // 2
+                // 14
+
+                int MultiplicandDigit = Multiplicand % 10; // 7
+                int MultiplierDigit = Multiplier % 10; // 2
+                int Product = MultiplicandDigit * MultiplierDigit; // 7 * 2 = 14
+                int Remainder = Product % 10; // 14 % 10 = 4
+
+                if(Remainder > 0)
+                {
+                    // 7777
+                    // 0012
+                    // 
+                }
+                else
+                {
+
+                }
+
+                Multiplicand /= 10;
+                Multiplier /= 10;
+            }
+        }
     }
-    else
-    {
-        // normalized number
-        e2 = e - 1023 - 52;
-        m2 = (1ULL << 52) | m;
-    }
-
-    // scale the numerator and denominator to integer
-    // mantissa and exponent -> d ~= m2 * 2^e2
-    
-    // normalized
-    // v ~= m2 * 2^e2
-    // m2 = 1 + f / 2^52
-    // m2 = (2^52 + f) / 2^52
-    // m2 * 2^52 = (2^52 + f) * 2^52 / 2^52
-    // "m2 * 2^52 = 2^52 + f" scaled value
-    // v ~= m2/2^52 * 2^e2
-    // v ~= m2 * 2^e2-52
-
-    // subnormal
-    // v ~= m2 * 2^e2
-    // m2 = f / 2^52
-    // m2 * 2^52 = f * 2^52 / 2*^52
-    // "m2 * 2^52 = f" scaled value
-    // v ~= m2 * 2^e2
-    // v ~= f/2^52 * 2^e2
-    // v ~= f * 2^e2-52
-
-    big_integer n;
-    big_integer d;
-
-    if(e2 >= 0)
-    {
-        // d ~= m * 2^e2
-        // i = (1 + f/2^52) * 2^e
-        // i = (2^52 + f)/2^52 * 2^e
-        // i = (2^52 + f) / 2^e-52
-        
-        BigIntegerToU64(&n, m2 << e2);
-        BigIntegerToU64(&n, 1);
-    }
-    else
-    {
-        // d ~= m * 2^e2
-        // i = m * 2^-e2
-        // i = f * 2^-1074
-        // i = f / 2^1074
-        BigIntegerToU64(&n, m2);
-        BigIntegerToU64(&d, 1ULL << -e2);
-    }
-
-    // @TODO: maybe reduce the fraction with Greatest Common Divisor
-
-    //
-*/
+}
 
 // float to string
 internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buffer, uptr BufferSize)
@@ -416,13 +385,13 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
 
     if(Exponent > 0)
     {
-        BigIntegerFromU64(&Numerator, Significand);
+        BigIntegerFromU64(&Numerator, Significand); //@TODO:
         BigIntegerFromU64(&Denominator, 1ULL << (Exponent - 52));
         Assert((Exponent - 52) > 0);
     }
     else
     {
-        BigIntegerFromU64(&Numerator, Significand);
+        BigIntegerFromU64(&Numerator, Significand); //@TODO:
         BigIntegerFromU64(&Denominator, 1ULL << -Exponent);
     }
 
