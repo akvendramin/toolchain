@@ -290,49 +290,41 @@ internal_function void BigIntegerFromU64(big_integer *BigInteger, u64 Value)
     }
 }
 
+// BigInteger multiply U64
 internal_function void BigIntegerMultiplyU64(big_integer *BigInteger, u64 Value)
 {
-    // 1 2 3 4 5 - - -
-    // 12
-
-    for(uptr Index = BigInteger->Size - 1; Index >= 0; Index--)
+    //@TODO: Test it
+    for(uptr I = BigInteger->Size - 1; I >= 0; I--)
     {
-        // 9999 8888 7777 ... 0000
-        // 12
+        u64 Multiplier = Value;
 
-        for(uptr Index = BigInteger->Size - 1; Index >= 0; Index--)
+        for(uptr J = BigInteger->Size - 1; Multiplier > 0; J--)
         {
-            // 7777
-            u64 Multiplicand = BigInteger->Value[Index];
-            u64 Multiplier = Value;
-
+            u64 Multiplicand = BigInteger->Value[J];
+            int Carry = 0;
+            
             while(Multiplicand > 0)
-            {
-                // 7
-                // 2
-                // 14
-
-                int MultiplicandDigit = Multiplicand % 10; // 7
-                int MultiplierDigit = Multiplier % 10; // 2
-                int Product = MultiplicandDigit * MultiplierDigit; // 7 * 2 = 14
-                int Remainder = Product % 10; // 14 % 10 = 4
-
-                if(Remainder > 0)
-                {
-                    // 7777
-                    // 0012
-                    // 
-                }
-                else
-                {
-
-                }
-
+            {                
+                int MultiplicandDigit = Multiplicand % 10;
+                int MultiplierDigit = Multiplier % 10;
+                int Product = (MultiplicandDigit * MultiplierDigit) + Carry;
+                Carry = Product >= 10;
                 Multiplicand /= 10;
-                Multiplier /= 10;
+
+                //@TODO: Store it
             }
+
+            Multiplier /= 10;
         }
     }
+}
+
+// BigInteger divide U64
+internal_function void BigIntegerDivideBigInteger(big_integer *A, big_integer *B, big_integer *C)
+{
+    //@TODO: Test it
+    // 9999 8888 7777
+    // ---- ---- 6666
 }
 
 // float to string
@@ -347,7 +339,7 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
 
     // get sign [63], exponent [62:52], significand [0:51] from double
     uptr Sign = Double.ValueU64 >> 63;
-    uptr Exponent = (Double.ValueU64 >> 52) & ((1ULL << 11) - 1);
+    sptr Exponent = (Double.ValueU64 >> 52) & ((1ULL << 11) - 1);
     uptr Significand = Double.ValueU64 & ((1ULL << 52) - 1);
 
     // some constants
@@ -395,10 +387,13 @@ internal_function uptr PlatformFloatToString(f64 Value, int Precision, char *Buf
         BigIntegerFromU64(&Denominator, 1ULL << -Exponent);
     }
 
-    // what operations do i need for numerator/denominator? division, multiplication, pow
+    // what operations do i need for numerator/denominator? division, multiplication
     // i scaled by 10^17 because log10(2^53) ~= 15.95 and we need 17 digits because 16 + 1 for round trip stuff
     // n / d
     // n*10^17 / d
+    big_integer C = {0};
+    BigIntegerMultiplyU64(&Numerator, 0x16345785D8A0000);
+    BigIntegerDivideBigInteger(&Numerator, &Denominator, &C);
 
     return Result;
 }
